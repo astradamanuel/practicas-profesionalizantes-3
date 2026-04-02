@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Stock Reciclaje</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <h1>Gestión de Stock</h1>
+
+  <!-- FORM CREAR MATERIAL -->
+  <h2>Agregar Material</h2>
+  <input id="nombre" placeholder="Nombre">
+  <input id="tipo" placeholder="Unidad (kg, m3, unidad)">
+  <input id="cantidad" type="number" placeholder="Cantidad">
+  <button onclick="crearMaterial()">Agregar</button>
+
+  <!-- TABLA -->
+  <h2>Materiales</h2>
+  <table border="1">
+    <thead>
+      <tr>
+        <th>Nombre</th>
+        <th>Unidad</th>
+        <th>Cantidad</th>
+        <th>Acciones</th>
+      </tr>
+    </thead>
+    <tbody id="tabla-materiales"></tbody>
+  </table>
+
+  <script src="app.js"></script>
+</body>
+</html>
