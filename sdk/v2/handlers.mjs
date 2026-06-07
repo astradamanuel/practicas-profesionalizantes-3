@@ -1,10 +1,10 @@
 import { readFileSync } from 'node:fs';
 import { URLSearchParams } from 'node:url';
-import * as dbManager from './db.mjs';
+import * as model from './model.mjs';
 
-export function default_handler(request, response, config) {
+export function default_handler(request, response) {
     try {
-        const html = readFileSync(config.server.default_path, 'utf-8');
+        const html = readFileSync('./default.html', 'utf-8');
         response.writeHead(200, { 'Content-Type': 'text/html' });
         response.end(html);
     } catch (error) {
@@ -13,20 +13,25 @@ export function default_handler(request, response, config) {
     }
 }
 
-// Handler para ALTA de usuario
-export function createUserHandler(request, response, db) {
+// Handler para ALTA de usuario (2 parámetros, 0 flechas)
+export function createUserHandler(request, response) {
     let body = '';
-    request.on('data', chunk => { body += chunk.toString(); });
-    request.on('end', async () => {
+
+    // Funciones tradicionales para los eventos del stream
+    function onData(chunk) {
+        body += chunk.toString();
+    }
+
+    function onEnd() {
         try {
             const params = new URLSearchParams(body);
             const user = params.get('username');
             const pass = params.get('password');
-            const group = params.get('group_id') || 3; // Por defecto 'guest' o similar
+            const group = params.get('group_id') || 3;
 
-            const resultado = await dbManager.createUser(db, user, pass);
-            // Automáticamente lo asignamos a un grupo (Gestión de Permisos)
-            await dbManager.addUserToGroup(db, resultado.id, group);
+            // Inserción sincrónica usando el modelo
+            const resultado = model.createUser(user, pass);
+            model.addUserToGroup(resultado.id, group);
 
             response.writeHead(201, { 'Content-Type': 'application/json' });
             response.end(JSON.stringify({ status: true, message: "Usuario creado y asignado" }));
@@ -34,38 +39,41 @@ export function createUserHandler(request, response, db) {
             response.writeHead(500, { 'Content-Type': 'application/json' });
             response.end(JSON.stringify({ status: false, error: error.message }));
         }
-    });
+    }
+
+    request.on('data', onData);
+    request.on('end', onEnd);
 }
 
-// Handler para BAJA de usuario
-export function deleteUserHandler(request, response, db) {
-    const url = new URL(request.url, `http://localhost`);
-    const id = url.searchParams.get('id');
+// Handler para BAJA de usuario (2 parámetros, 0 flechas)
+export function deleteUserHandler(request, response) {
+    try {
+        const url = new URL(request.url, `http://localhost`);
+        const id = url.searchParams.get('id');
 
-    dbManager.deleteUser(db, id)
-        .then(res => {
-            response.writeHead(200, { 'Content-Type': 'application/json' });
-            response.end(JSON.stringify({ status: true, result: res }));
-        })
-        .catch(err => {
-            response.writeHead(500);
-            response.end(JSON.stringify({ error: err.message }));
-        });
+        const res = model.deleteUser(id);
+
+        response.writeHead(200, { 'Content-Type': 'application/json' });
+        response.end(JSON.stringify({ status: true, result: res }));
+    } catch (error) {
+        response.writeHead(500, { 'Content-Type': 'application/json' });
+        response.end(JSON.stringify({ status: false, error: error.message }));
+    }
 }
 
-// Handler para MODIFICACIÓN de permisos
-export function assignGroupHandler(request, response, db) {
-    const url = new URL(request.url, `http://localhost`);
-    const id_user = url.searchParams.get('user');
-    const id_group = url.searchParams.get('group');
+// Handler para MODIFICACIÓN de permisos (2 parámetros, 0 flechas)
+export function assignGroupHandler(request, response) {
+    try {
+        const url = new URL(request.url, `http://localhost`);
+        const id_user = url.searchParams.get('user');
+        const id_group = url.searchParams.get('group');
 
-    dbManager.assignGroup(db, id_user, id_group)
-        .then(res => {
-            response.writeHead(200, { 'Content-Type': 'application/json' });
-            response.end(JSON.stringify({ status: true, message: "Permisos actualizados", result: res }));
-        })
-        .catch(err => {
-            response.writeHead(500, { 'Content-Type': 'application/json' });
-            response.end(JSON.stringify({ status: false, error: err.message }));
-        });
+        const res = model.assignGroup(id_user, id_group);
+
+        response.writeHead(200, { 'Content-Type': 'application/json' });
+        response.end(JSON.stringify({ status: true, message: "Permisos actualizados", result: res }));
+    } catch (error) {
+        response.writeHead(500, { 'Content-Type': 'application/json' });
+        response.end(JSON.stringify({ status: false, error: error.message }));
+    }
 }
