@@ -41,36 +41,33 @@
             <h3>Pruebas de Autorización (Punto 1 y 2)</h3>
             <p>Probá ejecutar acciones según tus permisos en la DB:</p>
             
-            <button class="btn-exito" id="btnLog">Ejecutar /log (Permitido)</button>
-            <button class="btn-error" id="btnSayHello">Ejecutar /sayHello (Denegado)</button>
+            <button class="btn-exito" id="btnLog">Ejecutar /log</button>
+            <button class="btn-error" id="btnSayHello">Ejecutar /sayHello</button>
             
             <div id="statusArea" class="resultado">Esperando acción...</div>
         </div>
 
         <hr>
-        <button id="btnMsg" style="width: auto;">Mostrar mensaje en consola</button>
-        <br><br>
-        <button onclick="location.reload()" style="background: none; color: blue; text-decoration: underline; border: none; width: auto;">Cerrar Sesión</button>
+        <button onclick="location.reload()" style="background: none; color: blue; text-decoration: underline; border: none; width: auto; cursor: pointer;">Cerrar Sesión</button>
     </div>
 
     <script>
-    let usuarioActual = "";
+    var usuarioActual = "";
 
-    // FUNCIÓN 1: LOGIN (Para entrar con usuarios que YA EXISTEN)
+    // FUNCIÓN 1: LOGIN
     async function alHacerClickEnLogin() {
-        const user = document.getElementById('username').value;
-        const pass = document.getElementById('password').value;
+        var user = document.getElementById('username').value;
+        var pass = document.getElementById('password').value;
 
         if(!user || !pass) return alert("Completá los campos");
 
-        // El backend espera un POST con JSON para el login
-        const response = await fetch('/login', {
+        var response = await fetch('/login', {
             method: 'POST',
             body: JSON.stringify({ username: user, password: pass }),
             headers: { 'Content-Type': 'application/json' }
         });
         
-        const session = await response.json();
+        var session = await response.json();
 
         if (response.ok && session !== null && session.status === 'enabled') {
             usuarioActual = user;
@@ -80,19 +77,19 @@
         }
     }
 
-    // FUNCIÓN 2: REGISTRO (Para crear un usuario nuevo SOLO UNA VEZ)
+    // FUNCIÓN 2: REGISTRO
     async function alHacerClickEnRegistro() {
-        const user = document.getElementById('username').value;
-        const pass = document.getElementById('password').value;
+        var user = document.getElementById('username').value;
+        var pass = document.getElementById('password').value;
 
         if(!user || !pass) return alert("Completá los campos para registrarte");
 
-        const response = await fetch(`/register?username=${user}&password=${pass}`);
+        var response = await fetch('/register?username=' + user + '&password=' + pass);
         
         if (response.ok) {
             alert("¡Usuario creado con éxito! Ahora hacé clic en 'Ingresar'.");
         } else {
-            const err = await response.json();
+            var err = await response.json();
             alert("Error al registrar: " + (err.error || "Intentalo de nuevo"));
         }
     }
@@ -104,12 +101,13 @@
     }
 
     async function probarPermiso(endpoint) {
-        const statusArea = document.getElementById('statusArea');
+        var statusArea = document.getElementById('statusArea');
         statusArea.innerText = "Consultando autorizador...";
         statusArea.style.color = "black";
 
-        const response = await fetch(`${endpoint}?user=${usuarioActual}`);
-        const data = await response.json();
+        // Manda el usuario por query, clavado para el filtro global del backend
+        var response = await fetch(endpoint + '?user=' + usuarioActual);
+        var data = await response.json();
 
         if (response.ok) {
             statusArea.style.color = "green";
@@ -120,18 +118,22 @@
         }
     }
 
-    function onBtnMsgOnClick() {
-        fetch("/showMessage");
+    // Funciones intermedias para evitar las funciones flecha en los onclick
+    function manejarClickLog() {
+        probarPermiso('/log');
+    }
+
+    function manejarClickSayHello() {
+        probarPermiso('/sayHello');
     }
 
     function main() {
-        // Vinculamos cada botón a su función correspondiente
         document.getElementById('btnLogin').onclick = alHacerClickEnLogin;
         document.getElementById('btnRegistro').onclick = alHacerClickEnRegistro;
-        document.getElementById('btnMsg').onclick = onBtnMsgOnClick;
         
-        document.getElementById('btnLog').onclick = () => probarPermiso('/log');
-        document.getElementById('btnSayHello').onclick = () => probarPermiso('/sayHello');
+        // Cambiado de flechas a funciones tradicionales referenciadas
+        document.getElementById('btnLog').onclick = manejarClickLog;
+        document.getElementById('btnSayHello').onclick = manejarClickSayHello;
     }
 
     window.onload = main;
