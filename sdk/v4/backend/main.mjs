@@ -54,6 +54,7 @@ function authenticate(username, password) {
 }
 
 function authorize(username, endpointPath) {
+    // Quitamos la barra inicial para cruzarlo con el campo 'path' de la DB
     const cleanPath = endpointPath.startsWith('/') ? endpointPath.slice(1) : endpointPath;
     const sql = `
         SELECT count(*) as total
@@ -74,7 +75,6 @@ function authorize(username, endpointPath) {
 }
 
 // --- 4. MANEJADORES (HANDLERS) ---
-// SE ELIMINÓ DEFAULT_HANDLER PORQUE EL BACKEND YA NO SIRVE HTML
 
 async function login_handler(request, response) {
     let body = '';
@@ -83,78 +83,114 @@ async function login_handler(request, response) {
     });
     
     request.on('end', function () {
-        const { username, password } = JSON.parse(body);
-        
-        if (authenticate(username, password)) {
-            let session = new UserSession();
-            userSessions.set(username, session);
-            response.writeHead(200, { 'Content-Type': 'application/json' });
-            response.end(JSON.stringify({ status: 'enabled', user: username }));
-        } else {
-            response.writeHead(401, { 'Content-Type': 'application/json' });
-            response.end(JSON.stringify({ error: "Credenciales inválidas" }));
+        try {
+            const { username, password } = JSON.parse(body);
+            
+            if (!username || !password) {
+                response.writeHead(400, { 'Content-Type': 'application/json' });
+                response.end(JSON.stringify({ 
+                    exception: 'InvalidSpecification', 
+                    detail: ['Faltan los campos obligatorios username o password en el JSON.'] 
+                }));
+                return;
+            }
+
+            if (authenticate(username, password)) {
+                let session = new UserSession();
+                userSessions.set(username, session);
+                response.writeHead(200, { 'Content-Type': 'application/json' });
+                response.end(JSON.stringify({ status: 'enabled', user: username }));
+            } else {
+                // Regla RPC: Código 401 y estructura estricta de excepción
+                response.writeHead(401, { 'Content-Type': 'application/json' });
+                response.end(JSON.stringify({ 
+                    exception: 'UnauthorizedException', 
+                    detail: ['El usuario o la contraseña ingresados son inválidos.'] 
+                }));
+            }
+        } catch (e) {
+            response.writeHead(400, { 'Content-Type': 'application/json' });
+            response.end(JSON.stringify({ 
+                exception: 'MalformedJson', 
+                detail: ['El cuerpo de la petición no contiene un formato JSON válido.'] 
+            }));
         }
     });
 }
 
 async function register_handler(request, response) {
-    const url = new URL(request.url, 'http://' + config.server.ip);
-    const user = url.searchParams.get('username');
-    const pass = url.searchParams.get('password');
+    let body = '';
+    request.on('data', function (chunk) { 
+        body += chunk.toString(); 
+    });
 
-    if (!user || !pass) {
-        response.writeHead(400, { 'Content-Type': 'application/json' });
-        response.end(JSON.stringify({ error: "Faltan datos de usuario o contraseña" }));
-        return;
-    }
+    request.on('end', function () {
+        try {
+            // Regla RPC: Extraemos los datos del body JSON y ya no de searchParams
+            const { username, password } = JSON.parse(body);
 
-    try {
-        const passwordHasheada = generarHash(pass);
-        const sqlUser = "INSERT INTO user (username, password) VALUES (?, ?)";
-        const stmtUser = db.prepare(sqlUser);
-        const result = stmtUser.run(user, passwordHasheada);
-        
-        const nuevoUserId = result.lastInsertRowid;
+            if (!username || !password) {
+                response.writeHead(400, { 'Content-Type': 'application/json' });
+                response.end(JSON.stringify({ 
+                    exception: 'InvalidSpecification', 
+                    detail: ['Se requiere username y password dentro del objeto JSON.'] 
+                }));
+                return;
+            }
 
-        const sqlMember = "INSERT INTO members (id_user, id_group) VALUES (?, 1)";
-        const stmtMember = db.prepare(sqlMember);
-        stmtMember.run(nuevoUserId);
+            try {
+                const passwordHasheada = generarHash(password);
+                const sqlUser = "INSERT INTO user (username, password) VALUES (?, ?)";
+                const stmtUser = db.prepare(sqlUser);
+                const result = stmtUser.run(username, passwordHasheada);
+                
+                const nuevoUserId = result.lastInsertRowid;
 
-        response.writeHead(200, { 'Content-Type': 'application/json' });
-        response.end(JSON.stringify({ message: "Usuario creado con éxito de forma segura." }));
-    } catch (err) {
-        response.writeHead(500, { 'Content-Type': 'application/json' });
-        response.end(JSON.stringify({ error: "El usuario ya existe o error de DB" }));
-    }
+                const sqlMember = "INSERT INTO members (id_user, id_group) VALUES (?, 1)";
+                const stmtMember = db.prepare(sqlMember);
+                stmtMember.run(nuevoUserId);
+
+                response.writeHead(200, { 'Content-Type': 'application/json' });
+                response.end(JSON.stringify({ message: "Usuario creado con éxito de forma segura." }));
+            } catch (err) {
+                response.writeHead(422, { 'Content-Type': 'application/json' });
+                response.end(JSON.stringify({ 
+                    exception: 'DomainException', 
+                    detail: ['El nombre de usuario ya se encuentra registrado en el sistema.'] 
+                }));
+            }
+        } catch (e) {
+            response.writeHead(400, { 'Content-Type': 'application/json' });
+            response.end(JSON.stringify({ 
+                exception: 'MalformedJson', 
+                detail: ['El cuerpo de la petición no contiene un formato JSON válido.'] 
+            }));
+        }
+    });
 }
 
 async function test_endpoint_handler(request, response) {
     const url = new URL(request.url, 'http://' + config.server.ip);
     const path = url.pathname;
     response.writeHead(200, { 'Content-Type': 'application/json' });
-    response.end(JSON.stringify({ message: `Acción satisfactoria en ${path}` }));
+    response.end(JSON.stringify({ message: `Acción satisfactoria ejecutada en el procedimiento ${path}` }));
 }
 
 // --- 5. RUTEADOR Y DESPACHADOR CENTRAL ---
 let router = new Map();
-// YA NO SE REGISTRA LA RUTA "/" AQUÍ
-router.set('/login', login_handler);
-router.set('/register', register_handler);
-router.set('/print', test_endpoint_handler);
-router.set('/log', test_endpoint_handler);
-router.set('/help', test_endpoint_handler);
-router.set('/sayHello', test_endpoint_handler);
-router.set('/sayBye', test_endpoint_handler);
+router.set('/loginUser', login_handler);
+router.set('/registerUser', register_handler);
+router.set('/logAction', test_endpoint_handler);
+router.set('/sayHelloAction', test_endpoint_handler);
 
-let publicRoutes = new Set(['/login', '/register']);
+let publicRoutes = new Set(['/loginUser', '/registerUser']);
 
 const server = createServer(async function (req, res) {
-    // 💡 ACTUALIZADO: Agregamos 'x-user-id' a las cabeceras permitidas por CORS como pide el profe
+    // Volvemos a habilitar 'x-user-id' en los headers de CORS
     res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-user-id');
+    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-user-id, X-API-Version');
 
-    // Si el navegador manda una petición de pre-vuelo (OPTIONS), respondemos OK directo (204)
     if (req.method === 'OPTIONS') {
         res.writeHead(204);
         res.end();
@@ -163,11 +199,34 @@ const server = createServer(async function (req, res) {
 
     const url = new URL(req.url, 'http://' + config.server.ip);
     const path = url.pathname;
+
+    if (req.method !== 'POST') {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ 
+            exception: 'MethodNotAllowed', 
+            detail: ['La especificación exige el uso exclusivo de POST para invocar procedimientos.'] 
+        }));
+        return;
+    }
+
     const handler = router.get(path);
 
     if (!handler) {
-        res.writeHead(404, { 'Content-Type': 'text/plain' });
-        res.end('Ruta no encontrada en la API');
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ 
+            exception: 'ProcedureNotFound', 
+            detail: [`El procedimiento solicitado [${path}] no existe.`] 
+        }));
+        return;
+    }
+
+    const apiVersion = req.headers['x-api-version'];
+    if (apiVersion !== '1.0') {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ 
+            exception: 'InvalidApiVersion', 
+            detail: ['Se requiere especificar explícitamente la cabecera X-API-Version: 1.0'] 
+        }));
         return;
     }
 
@@ -175,25 +234,29 @@ const server = createServer(async function (req, res) {
         return await handler(req, res);
     }
 
-    // 💡 SOLUCIÓN A LA CONSIGNA: Consumimos el usuario desde las cabeceras del request
-    // Nota: Node.js convierte automáticamente todas las cabeceras entrantes a minúsculas
+    // 💡 REFACTORIZADO POR CONSIGNA: Conservamos 'x-user-id' del punto 2
     const user = req.headers['x-user-id']; 
 
-    if (!user) {
+    if (!user || user.trim() === "") {
         res.writeHead(401, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: "No se proporcionó la cabecera de seguridad 'x-user-id'." }));
+        res.end(JSON.stringify({ 
+            exception: 'MissingAuthorization', 
+            detail: ["No se proporcionó la cabecera de seguridad mandatoria 'x-user-id'."] 
+        }));
         return;
     }
 
-    // El filtro corre usando el usuario recuperado de la cabecera HTTP
     if (authorize(user, path)) {
         return await handler(req, res);
     } else {
-        res.writeHead(403, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: `Acceso denegado globalmente a ${path}` }));
+        res.writeHead(401, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ 
+            exception: 'AccessDeniedException', 
+            detail: [`El usuario [${user}] no cuenta con privilegios para ejecutar el procedimiento [${path}].`] 
+        }));
     }
 });
 
 server.listen(config.server.port, config.server.ip, function () {
-    console.log(`WebAPI (Backend) corriendo en http://${config.server.ip}:${config.server.port}`);
+    console.log(`WebAPI RPC (Backend) corriendo en http://${config.server.ip}:${config.server.port}`);
 });

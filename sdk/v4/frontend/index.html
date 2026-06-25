@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Login - Sistema de Autorización</title>
+    <title>Login - Sistema de Autorización RPC</title>
     <style>
         /* La sección privada empieza oculta */
         #seccion-privada { display: none; }
@@ -23,7 +23,7 @@
 <body>
 
     <div id="seccion-inicio" class="box">
-        <h1>Acceso al Sistema</h1>
+        <h1>Acceso al Sistema (RPC)</h1>
         <label>Usuario:</label>
         <input id="username" style="width: 95%; padding: 5px;" required><br><br>
         <label>Password:</label>
@@ -38,11 +38,11 @@
         <p>Has ingresado correctamente al sistema.</p>
         
         <div class="botones-prueba">
-            <h3>Pruebas de Autorización (Punto 1 y 2)</h3>
+            <h3>Pruebas de Autorización RPC</h3>
             <p>Probá ejecutar acciones según tus permisos en la DB:</p>
             
-            <button class="btn-exito" id="btnLog">Ejecutar /log</button>
-            <button class="btn-error" id="btnSayHello">Ejecutar /sayHello</button>
+            <button class="btn-exito" id="btnLog">Ejecutar /logAction</button>
+            <button class="btn-error" id="btnSayHello">Ejecutar /sayHelloAction</button>
             
             <div id="statusArea" class="resultado">Esperando acción...</div>
         </div>
@@ -54,45 +54,54 @@
     <script>
     var usuarioActual = "";
 
-    // FUNCIÓN 1: LOGIN (Modificada con la URL del Backend v4)
+    // FUNCIÓN 1: LOGIN (RPC con x-user-id)
     async function alHacerClickEnLogin() {
         var user = document.getElementById('username').value;
         var pass = document.getElementById('password').value;
 
         if(!user || !pass) return alert("Completá los campos");
 
-        // Apunta directo al puerto 8080 del backend NodeJS
-        var response = await fetch('http://127.0.0.1:8080/login', {
+        var response = await fetch('http://127.0.0.1:8080/loginUser', {
             method: 'POST',
-            body: JSON.stringify({ username: user, password: pass }),
-            headers: { 'Content-Type': 'application/json' }
+            headers: { 
+                'Content-Type': 'application/json',
+                'X-API-Version': '1.0'
+            },
+            body: JSON.stringify({ username: user, password: pass })
         });
         
-        var session = await response.json();
+        var data = await response.json();
 
-        if (response.ok && session !== null && session.status === 'enabled') {
+        if (response.ok && data !== null && data.status === 'enabled') {
             usuarioActual = user;
             mostrarPanelPrivado(user);
         } else {
-            alert("Usuario o contraseña incorrectos. Si no tenés cuenta, registrate.");
+            alert("Error: " + (data.exception || "Usuario o contraseña incorrectos."));
         }
     }
 
-    // FUNCIÓN 2: REGISTRO (Modificada con la URL del Backend v4)
+    // FUNCIÓN 2: REGISTRO (RPC con x-user-id)
     async function alHacerClickEnRegistro() {
         var user = document.getElementById('username').value;
         var pass = document.getElementById('password').value;
 
         if(!user || !pass) return alert("Completá los campos para registrarte");
 
-        // Apunta directo al puerto 8080 del backend NodeJS
-        var response = await fetch('http://127.0.0.1:8080/register?username=' + user + '&password=' + pass);
+        var response = await fetch('http://127.0.0.1:8080/registerUser', {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+                'X-API-Version': '1.0'
+            },
+            body: JSON.stringify({ username: user, password: pass })
+        });
+        
+        var data = await response.json();
         
         if (response.ok) {
             alert("¡Usuario creado con éxito! Ahora hacé clic en 'Ingresar'.");
         } else {
-            var err = await response.json();
-            alert("Error al registrar: " + (err.error || "Intentalo de nuevo"));
+            alert("Error al registrar: " + (data.exception || "Intentalo de nuevo"));
         }
     }
 
@@ -102,18 +111,18 @@
         document.getElementById('bienvenida').innerText = "Hola " + user;
     }
 
-    // FUNCIÓN 3: PRUEBA DE PERMISOS (Modificada para usar Cabeceras HTTP Transversales)
+    // FUNCIÓN 3: PRUEBA DE PERMISOS (Conserva x-user-id según Consigna)
     async function probarPermiso(endpoint) {
         var statusArea = document.getElementById('statusArea');
-        statusArea.innerText = "Consultando autorizador...";
+        statusArea.innerText = "Consultando autorizador RPC...";
         statusArea.style.color = "black";
 
-        // Ya NO mandamos '?user=' en la URL. Va limpio.
         var response = await fetch('http://127.0.0.1:8080' + endpoint, {
-            method: 'GET', // O el método que corresponda
+            method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'x-user-id': usuarioActual // <--- Inyectamos el usuario en la cabecera personalizada
+                'x-user-id': usuarioActual, // <--- Volvemos a la del punto 2 como pide la excepción de la consigna
+                'X-API-Version': '1.0'
             }
         });
         
@@ -124,24 +133,23 @@
             statusArea.innerText = "Satisfecho: " + data.message;
         } else {
             statusArea.style.color = "red";
-            statusArea.innerText = "Denegado: " + (data.error || "Acceso denegado");
+            var detalleTexto = (data.detail && data.detail[0]) ? (" - " + data.detail[0]) : "";
+            statusArea.innerText = "Denegado: " + (data.exception || "Acceso denegado") + detalleTexto;
         }
     }
 
-    // Funciones intermedias para evitar las funciones flecha en los onclick
     function manejarClickLog() {
-        probarPermiso('/log');
+        probarPermiso('/logAction');
     }
 
     function manejarClickSayHello() {
-        probarPermiso('/sayHello');
+        probarPermiso('/sayHelloAction');
     }
 
     function main() {
         document.getElementById('btnLogin').onclick = alHacerClickEnLogin;
         document.getElementById('btnRegistro').onclick = alHacerClickEnRegistro;
         
-        // Asignación con funciones tradicionales referenciadas
         document.getElementById('btnLog').onclick = manejarClickLog;
         document.getElementById('btnSayHello').onclick = manejarClickSayHello;
     }
