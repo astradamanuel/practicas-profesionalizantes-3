@@ -46,3 +46,77 @@ export function assignGroup(id_user, id_group) {
     stmt.run(id_user, id_group);
     return { status: "success", id_user, id_group };
 }
+
+
+// =========================================================================
+// --- NUEVAS FUNCIONES AGREGADAS ---
+// =========================================================================
+
+// --- 6. GESTIÓN DE GRUPOS (Crear, Modificar, Eliminar) ---
+
+export function createGroup(name) {
+    const sql = `INSERT INTO "group" (name) VALUES (?)`;
+    const stmt = db.prepare(sql);
+    const result = stmt.run(name);
+    return { id: result.lastInsertRowid, name };
+}
+
+export function updateGroupName(id, newName) {
+    const sql = `UPDATE "group" SET name = ? WHERE id = ?`;
+    const stmt = db.prepare(sql);
+    stmt.run(newName, id);
+    return { updatedGroupID: id, newName };
+}
+
+export function deleteGroup(id) {
+    const sqlMembers = `DELETE FROM members WHERE id_group = ?`;
+    const stmtMembers = db.prepare(sqlMembers);
+    stmtMembers.run(id);
+
+    const sqlAccess = `DELETE FROM access WHERE id_group = ?`;
+    const stmtAccess = db.prepare(sqlAccess);
+    stmtAccess.run(id);
+
+    const sqlGroup = `DELETE FROM "group" WHERE id = ?`;
+    const stmtGroup = db.prepare(sqlGroup);
+    stmtGroup.run(id);
+
+    return { deletedGroupID: id };
+}
+
+// --- 7. GESTIÓN DE ENDPOINTS/ACCIONES (Crear, Eliminar) ---
+
+export function createEndpoint(name) {
+    const sql = `INSERT INTO endpoint (name) VALUES (?)`;
+    const stmt = db.prepare(sql);
+    const result = stmt.run(name);
+    return { id: result.lastInsertRowid, name };
+}
+
+export function deleteEndpoint(id) {
+    const sqlAccess = `DELETE FROM access WHERE id_endpoint = ?`;
+    const stmtAccess = db.prepare(sqlAccess);
+    stmtAccess.run(id);
+
+    const sqlEndpoint = `DELETE FROM endpoint WHERE id = ?`;
+    const stmtEndpoint = db.prepare(sqlEndpoint);
+    stmtEndpoint.run(id);
+
+    return { deletedEndpointID: id };
+}
+
+// --- 8. GESTIÓN DE ACCESOS (Asignar Endpoint a Grupo) ---
+
+export function assignEndpointToGroup(id_group, id_endpoint) {
+    const sql = `INSERT OR REPLACE INTO access (id_group, id_endpoint) VALUES (?, ?)`;
+    const stmt = db.prepare(sql);
+    stmt.run(id_group, id_endpoint);
+    return { status: "access_assigned", id_group, id_endpoint };
+}
+
+export function removeEndpointFromGroup(id_group, id_endpoint) {
+    const sql = `DELETE FROM access WHERE id_group = ? AND id_endpoint = ?`;
+    const stmt = db.prepare(sql);
+    stmt.run(id_group, id_endpoint);
+    return { status: "access_removed", id_group, id_endpoint };
+}

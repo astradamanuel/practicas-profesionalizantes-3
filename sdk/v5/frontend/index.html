@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Login - Sistema de Autorización RPC</title>
+    <style>
+        /* La sección privada empieza oculta */
+        #seccion-privada { display: none; }
+        .box { border: 1px solid #ccc; padding: 20px; margin: 20px; border-radius: 8px; max-width: 500px; font-family: sans-serif; }
+        .botones-prueba { margin-top: 20px; padding: 15px; background-color: #f9f9f9; border-radius: 5px; }
+        .resultado { margin-top: 10px; padding: 10px; font-weight: bold; border: 1px dashed #999; }
+        
+        button { cursor: pointer; padding: 10px; margin: 5px 0; border-radius: 4px; border: 1px solid #ccc; width: 100%; }
+        button:hover { opacity: 0.8; }
+        
+        /* Colores para distinguir acciones */
+        .btn-exito { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .btn-error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+    </style>
+</head>
+<body>
+
+    <div id="seccion-inicio" class="box">
+        <h1>Acceso al Sistema (RPC)</h1>
+        
+        <!-- Componente de Login (Consigna 2) -->
+        <wc-login-form-view id="loginFormView"></wc-login-form-view>
+        
+        <br><hr><br>
+        
+        <!-- Componente de Registro (Consigna 2) -->
+        <wc-register-form-view id="registerFormView"></wc-register-form-view>
+    </div>
+
+    <div id="seccion-privada" class="box">
+        <h1 id="bienvenida"></h1>
+        <p>Has ingresado correctamente al sistema.</p>
+        
+        <div class="botones-prueba">
+            <h3>Pruebas de Autorización RPC</h3>
+            <p>Probá ejecutar acciones según tus permisos en la DB:</p>
+            
+            <button class="btn-exito" id="btnLog">Ejecutar /logAction</button>
+            <button class="btn-error" id="btnSayHello">Ejecutar /sayHelloAction</button>
+            
+            <div id="statusArea" class="resultado">Esperando acción...</div>
+        </div>
+
+        <hr>
+        <button onclick="location.reload()" style="background: none; color: blue; text-decoration: underline; border: none; width: auto; cursor: pointer;">Cerrar Sesión</button>
+    </div>
+
+    <script>
+    // =========================================================================
+    // 1. WEBCOMPONENT: WCLoginFormView (Estricto según directrices de cátedra)
+    // =========================================================================
+    class WCLoginFormView extends HTMLElement {
+        constructor() {
+            super();
+            this.attachShadow({ mode: 'open' });
+
+            // Contenedor principal
+            this.container = document.createElement('div');
+            this.container.style.fontFamily = 'sans-serif';
+
+            var titulo = document.createElement('h3');
+            titulo.textContent = 'Ingresar al Sistema';
+            this.container.appendChild(titulo);
+
+            this.formulario = document.createElement('form');
+
+            // Grupo Usuario
+            var grupoUsuario = document.createElement('div');
+            grupoUsuario.style.marginBottom = '10px';
+            var labelUsuario = document.createElement('label');
+            labelUsuario.textContent = 'Usuario:';
+            labelUsuario.style.display = 'block';
+            labelUsuario.style.marginBottom = '3px';
+            this.inputUsuario = document.createElement('input');
+            this.inputUsuario.type = 'text';
+            this.inputUsuario.required = true;
+            this.inputUsuario.style.width = '100%';
+            this.inputUsuario.style.padding = '6px';
+            this.inputUsuario.style.boxSizing = 'border-box';
+            grupoUsuario.appendChild(labelUsuario);
+            grupoUsuario.appendChild(this.inputUsuario);
+
+            // Grupo Password
+            var grupoPassword = document.createElement('div');
+            grupoPassword.style.marginBottom = '15px';
+            var labelPassword = document.createElement('label');
+            labelPassword.textContent = 'Password:';
+            labelPassword.style.display = 'block';
+            labelPassword.style.marginBottom = '3px';
+            this.inputPassword = document.createElement('input');
+            this.inputPassword.type = 'password';
+            this.inputPassword.required = true;
+            this.inputPassword.style.width = '100%';
+            this.inputPassword.style.padding = '6px';
+            this.inputPassword.style.boxSizing = 'border-box';
+            grupoPassword.appendChild(labelPassword);
+            grupoPassword.appendChild(this.inputPassword);
+
+            // Botón de Envío
+            this.btnSubmit = document.createElement('button');
+            this.btnSubmit.type = 'submit';
+            this.btnSubmit.textContent = 'Ingresar';
+            this.btnSubmit.style.cursor = 'pointer';
+            this.btnSubmit.style.padding = '10px';
+            this.btnSubmit.style.borderRadius = '4px';
+            this.btnSubmit.style.border = 'none';
+            this.btnSubmit.style.width = '100%';
+            this.btnSubmit.style.backgroundColor = '#007bff';
+            this.btnSubmit.style.color = 'white';
+            this.btnSubmit.style.fontWeight = 'bold';
+
+            // Armado de la estructura
+            this.formulario.appendChild(grupoUsuario);
+            this.formulario.appendChild(grupoPassword);
+            this.formulario.appendChild(this.btnSubmit);
+            this.container.appendChild(this.formulario);
+            
+            this.shadowRoot.appendChild(this.container);
+
+            // Enlace de contexto clásico (Evita funciones flecha)
+            this.manejarSubmit = this.manejarSubmit.bind(this);
+        }
+
+        connectedCallback() {
+            // Única y estrictamente para conectar eventos externos/internos
+            this.formulario.addEventListener('submit', this.manejarSubmit);
+        }
+
+        disconnectedCallback() {
+            // Desconexión obligatoria del evento
+            this.formulario.removeEventListener('submit', this.manejarSubmit);
+        }
+
+        manejarSubmit(event) {
+            event.preventDefault();
+
+            var eventoLogin = new CustomEvent('login-submit', {
+                detail: {
+                    username: this.inputUsuario.value,
+                    password: this.inputPassword.value
+                },
+                bubbles: true,
+                composed: true
+            });
+
+            this.dispatchEvent(eventoLogin);
+        }
+    }
+    customElements.define('wc-login-form-view', WCLoginFormView);
+
+
+    // =========================================================================
+    // 2. WEBCOMPONENT: WCRegisterFormView (Estricto según directrices de cátedra)
+    // =========================================================================
+    class WCRegisterFormView extends HTMLElement {
+        constructor() {
+            super();
+            this.attachShadow({ mode: 'open' });
+
+            // Contenedor principal
+            this.container = document.createElement('div');
+            this.container.style.fontFamily = 'sans-serif';
+
+            var titulo = document.createElement('h3');
+            titulo.textContent = 'Registrarse (Nuevo Usuario)';
+            this.container.appendChild(titulo);
+
+            this.formulario = document.createElement('form');
+
+            // Fila Horizontal de Usuario
+            var filaUsuario = document.createElement('div');
+            filaUsuario.style.display = 'flex';
+            filaUsuario.style.alignItems = 'center';
+            filaUsuario.style.marginBottom = '10px';
+
+            var colLabelUsuario = document.createElement('div');
+            colLabelUsuario.style.flex = '0 0 25%';
+            colLabelUsuario.style.maxWidth = '25%';
+            var labelUsuario = document.createElement('label');
+            labelUsuario.textContent = 'Usuario:';
+            labelUsuario.style.fontWeight = 'bold';
+            colLabelUsuario.appendChild(labelUsuario);
+
+            var colInputUsuario = document.createElement('div');
+            colInputUsuario.style.flex = '0 0 75%';
+            colInputUsuario.style.maxWidth = '75%';
+            this.inputUsuario = document.createElement('input');
+            this.inputUsuario.type = 'text';
+            this.inputUsuario.required = true;
+            this.inputUsuario.style.width = '100%';
+            this.inputUsuario.style.padding = '6px';
+            this.inputUsuario.style.boxSizing = 'border-box';
+            colInputUsuario.appendChild(this.inputUsuario);
+
+            filaUsuario.appendChild(colLabelUsuario);
+            filaUsuario.appendChild(colInputUsuario);
+
+            // Fila Horizontal de Password
+            var filaPassword = document.createElement('div');
+            filaPassword.style.display = 'flex';
+            filaPassword.style.alignItems = 'center';
+            filaPassword.style.marginBottom = '15px';
+
+            var colLabelPassword = document.createElement('div');
+            colLabelPassword.style.flex = '0 0 25%';
+            colLabelPassword.style.maxWidth = '25%';
+            var labelPassword = document.createElement('label');
+            labelPassword.textContent = 'Password:';
+            labelPassword.style.fontWeight = 'bold';
+            colLabelPassword.appendChild(labelPassword);
+
+            var colInputPassword = document.createElement('div');
+            colInputPassword.style.flex = '0 0 75%';
+            colInputPassword.style.maxWidth = '75%';
+            this.inputPassword = document.createElement('input');
+            this.inputPassword.type = 'password';
+            this.inputPassword.required = true;
+            this.inputPassword.style.width = '100%';
+            this.inputPassword.style.padding = '6px';
+            this.inputPassword.style.boxSizing = 'border-box';
+            colInputPassword.appendChild(this.inputPassword);
+
+            filaPassword.appendChild(colLabelPassword);
+            filaPassword.appendChild(colInputPassword);
+
+            // Fila de Botón
+            var filaBoton = document.createElement('div');
+            filaBoton.style.display = 'flex';
+            filaBoton.style.justifyContent = 'flex-end';
+
+            this.btnSubmit = document.createElement('button');
+            this.btnSubmit.type = 'submit';
+            this.btnSubmit.textContent = 'Registrarse';
+            this.btnSubmit.style.cursor = 'pointer';
+            this.btnSubmit.style.padding = '10px 20px';
+            this.btnSubmit.style.borderRadius = '4px';
+            this.btnSubmit.style.border = 'none';
+            this.btnSubmit.style.backgroundColor = '#6c757d';
+            this.btnSubmit.style.color = 'white';
+            this.btnSubmit.style.fontWeight = 'bold';
+            filaBoton.appendChild(this.btnSubmit);
+
+            // Armado de la estructura
+            this.formulario.appendChild(filaUsuario);
+            this.formulario.appendChild(filaPassword);
+            this.formulario.appendChild(filaBoton);
+            this.container.appendChild(this.formulario);
+
+            this.shadowRoot.appendChild(this.container);
+
+            // Enlace de contexto clásico
+            this.manejarSubmit = this.manejarSubmit.bind(this);
+        }
+
+        connectedCallback() {
+            this.formulario.addEventListener('submit', this.manejarSubmit);
+        }
+
+        disconnectedCallback() {
+            this.formulario.removeEventListener('submit', this.manejarSubmit);
+        }
+
+        manejarSubmit(event) {
+            event.preventDefault();
+
+            var eventoRegister = new CustomEvent('register-submit', {
+                detail: {
+                    username: this.inputUsuario.value,
+                    password: this.inputPassword.value
+                },
+                bubbles: true,
+                composed: true
+            });
+
+            this.dispatchEvent(eventoRegister);
+        }
+    }
+    customElements.define('wc-register-form-view', WCRegisterFormView);
+
+
+    // =========================================================================
+    // 3. LÓGICA DE NEGOCIO Y CONTROLADORES (Consigna 1)
+    // =========================================================================
+    var usuarioActual = "";
+
+    // FUNCIÓN CENTRAL: Abstracción RPC para peticiones WebAPI
+    async function RPCWebAPIFetch(name, content) {
+        var baseUrl = 'http://127.0.0.1:8080';
+        
+        var headers = { 
+            'Content-Type': 'application/json',
+            'X-API-Version': '1.0'
+        };
+
+        if (usuarioActual) {
+            headers['x-user-id'] = usuarioActual;
+        }
+
+        var opciones = {
+            method: 'POST',
+            headers: headers
+        };
+
+        if (content) {
+            opciones.body = JSON.stringify(content);
+        }
+
+        var response = await fetch(baseUrl + name, opciones);
+        
+        var data;
+        try {
+            data = await response.json();
+        } catch (e) {
+            throw { exception: "Error en el formato de respuesta del servidor." };
+        }
+
+        if (!response.ok) {
+            throw {
+                status: response.status,
+                exception: data ? data.exception : "Acceso denegado",
+                detail: data ? data.detail : []
+            };
+        }
+
+        return data;
+    }
+
+    // CONTROLADOR 1: LOGIN (RPC)
+    async function ejecutarLogin(user, pass) {
+        if(!user || !pass) return alert("Completá los campos");
+
+        try {
+            var data = await RPCWebAPIFetch('/loginUser', { username: user, password: pass });
+
+            if (data !== null && data.status === 'enabled') {
+                usuarioActual = user;
+                mostrarPanelPrivado(user);
+            } else {
+                alert("Error: El usuario no está habilitado.");
+            }
+        } catch (error) {
+            alert("Error: " + (error.exception || "Usuario o contraseña incorrectos."));
+        }
+    }
+
+    // CONTROLADOR 2: REGISTRO (RPC)
+    async function ejecutarRegistro(user, pass) {
+        if(!user || !pass) return alert("Completá los campos para registrarte");
+
+        try {
+            await RPCWebAPIFetch('/registerUser', { username: user, password: pass });
+            alert("¡Usuario creado con éxito! Ahora podés ingresar.");
+        } catch (error) {
+            alert("Error al registrar: " + (error.exception || "Intentalo de nuevo"));
+        }
+    }
+
+    function mostrarPanelPrivado(user) {
+        document.getElementById('seccion-inicio').style.display = 'none';
+        document.getElementById('seccion-privada').style.display = 'block';
+        document.getElementById('bienvenida').innerText = "Hola " + user;
+    }
+
+    // CONTROLADOR 3: PRUEBA DE PERMISOS (RPC)
+    async function probarPermiso(endpoint) {
+        var statusArea = document.getElementById('statusArea');
+        statusArea.innerText = "Consultando autorizador RPC...";
+        statusArea.style.color = "black";
+
+        try {
+            var data = await RPCWebAPIFetch(endpoint);
+            
+            statusArea.style.color = "green";
+            statusArea.innerText = "Satisfecho: " + data.message;
+        } catch (error) {
+            statusArea.style.color = "red";
+            var detalleTexto = (error.detail && error.detail[0]) ? (" - " + error.detail[0]) : "";
+            statusArea.innerText = "Denegado (" + error.status + "): " + error.exception + detalleTexto;
+        }
+    }
+
+    function manejarClickLog() {
+        probarPermiso('/logAction');
+    }
+
+    function manejarClickSayHello() {
+        probarPermiso('/sayHelloAction');
+    }
+
+    // =========================================================================
+    // 4. INICIALIZACIÓN (Standard de clase - Sin whenDefined alternativos)
+    // =========================================================================
+    function inicializar() {
+        var loginComp = document.getElementById('loginFormView');
+        var registerComp = document.getElementById('registerFormView');
+
+        // Escucha de eventos personalizados de los WebComponents
+        loginComp.addEventListener('login-submit', function(event) {
+            ejecutarLogin(event.detail.username, event.detail.password);
+        });
+
+        registerComp.addEventListener('register-submit', function(event) {
+            ejecutarRegistro(event.detail.username, event.detail.password);
+        });
+
+        // Configuración de botones de prueba
+        document.getElementById('btnLog').onclick = manejarClickLog;
+        document.getElementById('btnSayHello').onclick = manejarClickSayHello;
+    }
+
+    window.onload = inicializar;
+</script>
+</body>
+</html>
