@@ -17,7 +17,6 @@
 <body class="w3-light-grey">
   <input id="sidebar-control" type="checkbox" class="w3-hide">
   <div id="app">
-    <!-- BARRA SUPERIOR -->
     <div class="w3-top w3-card" style="height:54px">
       <div class="w3-flex-bar w3-theme w3-left-align">
         <div class="admin-logo w3-bar-item w3-hide-medium w3-hide-small">
@@ -46,8 +45,6 @@
         </div>
       </div>
     </div>
-
-    <!-- MENÚ LATERAL -->
     <nav id="sidebar" class="w3-sidebar w3-top w3-bottom w3-collapse w3-white w3-border-right w3-border-top scrollbar" style="z-index:3;width:230px;height:auto;margin-top:54px;border-color:rgba(0, 0, 0, .1)!important" id="mySidebar">
       <div class="w3-bar-item w3-border-bottom w3-hide-large" style="padding:6px 0">
         <label for="sidebar-control" class="w3-left w3-button w3-large w3-opacity-min" style="background:white!important"><i class="fa fa-bars"></i></label>
@@ -81,57 +78,61 @@
           <i class="fa fa-fw fa-share-alt w3-text-info"></i>&nbsp; Information </a>
       </div>
     </nav>
-
-    <!-- CONTENIDO PRINCIPAL -->
     <div class="w3-main" style="margin-top:54px">
       <div style="padding:16px 32px">
         <div class="w3-padding-32">
-     
-          <div class="w3-auto" style="max-width:800px">
-            
-            <!-- Inyección del WebComponent de Registro -->
+          <div class="w3-auto" style="width:550px">
+            <!-- REEMPLAZADO POR EL WEBCOMPONENT -->
             <wc-register-form-view></wc-register-form-view>
-            
-            <div class="w3-center">
-              <p class="w3-margin"><span class="w3-text-warning">Already have an account?</span> <a href="login.html"> Sign In here</a></p>
-            </div>
           </div>
         </div>
       </div>
-      
-      <!-- PIE DE PÁGINA -->
       <footer class="w3-padding w3-border-top w3-center w3-white w3-margin-top">
         <span class="w3-opacity">Powered with <span class="w3-text-red">♥</span> by <a href="https://w3mix.com" target="_blank"><strong>W3Mix.com</strong></a>.</span>
       </footer>
     </div>
   </div>
 
-  <!-- SCRIPTS DE ARQUITECTURA Y COMPONENTES -->
+  <!-- PLANTILLA HTML QUE CONSUMIRÁ EL WEBCOMPONENT DE REGISTRO -->
+  <template id="template-register-form">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap">
+    <link rel="stylesheet" href="./assets/icons/font-awesome-4.7.0/css/font-awesome.min.css">
+    <link rel="stylesheet" href="./assets/css/w3pro-4.13.css">
+    <link rel="stylesheet" href="./assets/css/w3-theme.css">
+    <link rel="stylesheet" href="./assets/css/admin-styles.css">
+
+    <form class="w3-white w3-round w3-border w3-card" action="">
+      <div class="w3-padding-large w3-large w3-border-bottom w3-center" style="font-weight: 500">
+        Create your W3Admin Account
+      </div>
+      <div class="w3-padding-large">
+        <div class="w3-margin-bottom">
+          <label>Username</label>
+          <input class="w3-input w3-border w3-round w3-gray-lighter w3-margin-top" type="text" name="username" required>
+        </div>
+        <div class="w3-margin-bottom">
+          <label>Email Address</label>
+          <input class="w3-input w3-border w3-round w3-gray-lighter w3-margin-top" type="email" name="email" required>
+        </div>
+        <div class="w3-margin-bottom">
+          <label>Password</label>
+          <input class="w3-input w3-border w3-round w3-gray-lighter w3-margin-top" type="password" name="password" required>
+        </div>
+        
+        <!-- Contenedor para mostrar excepciones de validación o de API de forma visual -->
+        <div class="mensaje-error" style="color: #ff3b30; font-size: 0.9em; margin-bottom: 15px; display: none; font-weight: 500;"></div>
+
+        <button type="submit" class="w3-button w3-block w3-primary w3-round">Register</button>
+      </div>
+      <div class="w3-padding-large w3-border-top w3-light-grey w3-center w3-small" style="border-radius: 0 0 4px 4px">
+        Already have an account? <a href="./login.html">Sign in</a>
+      </div>
+    </form>
+  </template>
+
+  <!-- IMPORTACIÓN DE LA API Y EL WEBCOMPONENT -->
   <script src="./api.js"></script>
   <script src="./WCRegisterFormView.js"></script>
-
-  <!-- CONTROLADOR PRINCIPAL DEL FRONTEND -->
-  <script>
-    document.addEventListener('DOMContentLoaded', function() {
-      var registerComponent = document.querySelector('wc-register-form-view');
-      
-      if (registerComponent) {
-        registerComponent.addEventListener('register-submit', async function(event) {
-          var datosRegistro = event.detail;
-
-          try {
-            var respuesta = await RPCWebAPIFetch('/api/register', datosRegistro);
-            
-            alert("¡Registro exitoso! Ya podés iniciar sesión.");
-            window.location.href = './login.html';
-          } catch (error) {
-            console.error("Error capturado en el controlador visual:", error);
-            alert("No se pudo completar el registro: " + (error.exception || "Error del servidor"));
-          }
-        });
-      }
-    });
-  </script>
 </body>
 
 </html>
