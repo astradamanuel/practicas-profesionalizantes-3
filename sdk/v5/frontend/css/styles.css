@@ -1,0 +1,9 @@
+/* Estilos complementarios para W3.CSS */
+.hidden {
+    display: none !important;
+}
+
+.w3-flex-bar {
+    display: flex;
+    align-items: center;
+}
